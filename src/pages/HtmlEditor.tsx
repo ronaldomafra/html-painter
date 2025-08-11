@@ -116,24 +116,25 @@ const HtmlEditor = () => {
   };
 
   const onMouseOver = (e: Event) => {
-    if (!(e.target instanceof Element)) return;
+    const targetNode = e.target as Node | null;
+    if (!targetNode || (targetNode as Node).nodeType !== 1) return; // cross-iframe safe
     if (locked) return; // do not change while locked
 
-    // remove previous highlight
-    if (hoverEl && hoverEl !== e.target) clearHighlight(hoverEl);
+    if (hoverEl && hoverEl !== (targetNode as Element)) clearHighlight(hoverEl);
 
-    const target = e.target as Element;
+    const target = targetNode as Element;
     target.classList.add("__lov-hover-highlight");
     setHoverEl(target);
     loadIntoForm(target);
   };
 
   const onClickEl = (e: Event) => {
-    if (!(e.target instanceof Element)) return;
+    const targetNode = e.target as Node | null;
+    if (!targetNode || targetNode.nodeType !== 1) return; // cross-iframe safe
     e.preventDefault();
     e.stopPropagation();
     // Toggle lock
-    const target = e.target as Element;
+    const target = targetNode as Element;
     setLocked((prev) => {
       const next = !prev;
       clearHighlight(hoverEl);
