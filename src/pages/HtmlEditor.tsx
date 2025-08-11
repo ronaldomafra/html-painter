@@ -96,8 +96,7 @@ const HtmlEditor = () => {
     if (!doc) return;
     setDocRef(doc);
 
-    // Clean previous listeners if needed
-    doc.addEventListener("mouseover", onMouseOver, true);
+    // Attach click listener; mouseover is managed by effect based on 'locked'
     doc.addEventListener("click", onClickEl, true);
 
     // Ensure a base CSS for highlighting
@@ -108,6 +107,19 @@ const HtmlEditor = () => {
     `;
     doc.head.appendChild(styleTag);
   };
+
+  // Manage mouseover binding based on 'locked' state to fully disable hover while editing
+  useEffect(() => {
+    if (!docRef) return;
+    if (locked) {
+      docRef.removeEventListener("mouseover", onMouseOver, true);
+    } else {
+      docRef.addEventListener("mouseover", onMouseOver, true);
+    }
+    return () => {
+      docRef.removeEventListener("mouseover", onMouseOver, true);
+    };
+  }, [docRef, locked]);
 
   const clearHighlight = (el: Element | null) => {
     if (!el) return;
@@ -133,20 +145,23 @@ const HtmlEditor = () => {
     if (!targetNode || targetNode.nodeType !== 1) return; // cross-iframe safe
     e.preventDefault();
     e.stopPropagation();
-    // Toggle lock
+    if (locked) return; // ignore clicks while editing
     const target = targetNode as Element;
-    setLocked((prev) => {
-      const next = !prev;
-      clearHighlight(hoverEl);
-      if (next) {
-        target.classList.add("__lov-selection-locked");
-      } else {
-        target.classList.add("__lov-hover-highlight");
-      }
-      setHoverEl(target);
-      loadIntoForm(target);
-      return next;
-    });
+    // enter editing mode and lock selection
+    if (hoverEl && hoverEl !== target) clearHighlight(hoverEl);
+    target.classList.remove("__lov-hover-highlight");
+    target.classList.add("__lov-selection-locked");
+    setHoverEl(target);
+    loadIntoForm(target);
+    setLocked(true);
+  };
+
+  const unlockSelection = () => {
+    setLocked(false);
+    if (hoverEl) {
+      hoverEl.classList.remove("__lov-selection-locked");
+      hoverEl.classList.add("__lov-hover-highlight");
+    }
   };
 
   const handleApplyChanges = () => {
@@ -161,6 +176,14 @@ const HtmlEditor = () => {
     else hoverEl.removeAttribute("style");
 
     hoverEl.textContent = elText;
+    unlockSelection();
+  };
+
+  const handleCancel = () => {
+    if (hoverEl) {
+      loadIntoForm(hoverEl);
+    }
+    unlockSelection();
   };
 
   const handleSave = () => {
@@ -280,9 +303,12 @@ const HtmlEditor = () => {
                   <Textarea id="elText" value={elText} onChange={(e) => setElText(e.target.value)} rows={6} />
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={handleApplyChanges} disabled={!hoverEl}>Aplicar alterações</Button>
-                  <Button variant="secondary" onClick={() => hoverEl && loadIntoForm(hoverEl)} disabled={!hoverEl}>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button onClick={handleApplyChanges} disabled={!hoverEl || !locked}>Aplicar alterações</Button>
+                  <Button variant="secondary" onClick={handleCancel} disabled={!hoverEl || !locked}>
+                    Cancelar
+                  </Button>
+                  <Button variant="outline" onClick={() => hoverEl && loadIntoForm(hoverEl)} disabled={!hoverEl}>
                     Recarregar do elemento
                   </Button>
                 </div>
